@@ -3,33 +3,43 @@ using Scalar.AspNetCore;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddOpenApi();
-builder.Services.AddHealthChecks();
-builder.Services.Configure<SonoffOptions>(builder.Configuration.GetSection("Sonoff"));
-builder.Services.AddHttpClient<SonoffClient>();
+builder.Services.AddHealthChecks().AddCheck<LedHealthCheck>("leds");
+builder.Services.AddHttpClient();
+
+var ledOptions = builder.Configuration.GetSection("Leds").Get<List<LedsOptions>>() ?? new();
+builder.Services.AddSingleton(sp =>
+    new LedRegister(ledOptions, sp.GetRequiredService<IHttpClientFactory>()));
 
 var app = builder.Build();
 
+app.UseDefaultFiles();
+app.UseStaticFiles();
 app.MapOpenApi();
-app.MapScalarApiReference();   // Seite unter /scalar
+app.MapScalarApiReference();
 app.MapHealthChecks("/health");
 
-// Hilfsfunktion: führt eine Aktion aus und fängt Verbindungsfehler ab
-static async Task<IResult> Ausfuehren(Func<Task<bool>> aktion)
+static async Task<IResult> Run(LedRegister register, string id, Func<ILeds, Task<bool>> action)
 {
+    var led = register.Find(id);
+    if (led == null)
+        return Results.NotFound(new { error = $"LED '{id}' unknown" });
+
     try
     {
-        bool an = await aktion();
-        return Results.Ok(new { zustand = an ? "an" : "aus" });
+        bool on = await action(led);
+        return Results.Ok(new { id = led.Id, name = led.Name, state = on ? "on" : "off" });
     }
     catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
     {
-        return Results.Problem("Sonoff nicht erreichbar", statusCode: 503);
+        Console.WriteLine($"LED '{id}' error: {ex.Message}");
+        return Results.Problem($"LED '{id}' not reachable", statusCode: 503);
     }
 }
 
-app.MapGet("/api/led", (SonoffClient s) => Ausfuehren(() => s.IstAnAsync()));
-app.MapPut("/api/led/on", (SonoffClient s) => Ausfuehren(() => s.SetzeAsync(1)));
-app.MapPut("/api/led/off", (SonoffClient s) => Ausfuehren(() => s.SetzeAsync(0)));
-app.MapPut("/api/led/toggle", (SonoffClient s) => Ausfuehren(() => s.SetzeAsync(2)));
+app.MapGet("/api/leds", (LedRegister r) => r.All.Select(l => new { id = l.Id, name = l.Name }));
+app.MapGet("/api/leds/{id}", (string id, LedRegister r) => Run(r, id, l => l.IsOnAsync()));
+app.MapPut("/api/leds/{id}/on", (string id, LedRegister r) => Run(r, id, l => l.SwitchAsync(LedAction.On)));
+app.MapPut("/api/leds/{id}/off", (string id, LedRegister r) => Run(r, id, l => l.SwitchAsync(LedAction.Off)));
+app.MapPut("/api/leds/{id}/toggle", (string id, LedRegister r) => Run(r, id, l => l.SwitchAsync(LedAction.Toggle)));
 
 app.Run();

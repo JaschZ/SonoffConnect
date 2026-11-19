@@ -19,18 +19,18 @@ public class SonoffClient
         _http.Timeout = TimeSpan.FromSeconds(_opt.Timeout);
     }
 
-    public async Task<bool> IstAnAsync() => await SendeAsync(null) == "1";
+    public async Task<bool> IsOnAsync() => await SendAsync(null) == "1";
 
-    public async Task<bool> SetzeAsync(int value) => await SendeAsync(value) == "1";
+    public async Task<bool> SetAsync(int value) => await SendAsync(value) == "1";
 
-    private async Task<string> SendeAsync(int? value)
+    private async Task<string> SendAsync(int? value)
     {
         string url = $"http://{_opt.Ip}/api/relay/0?apikey={_opt.ApiKey}";
         if (value.HasValue)
             url += $"&value={value.Value}";
 
-        var antwort = await _http.GetAsync(url);
-        antwort.EnsureSuccessStatusCode();
-        return (await antwort.Content.ReadAsStringAsync()).Trim();
+        var respond = await _http.GetAsync(url);
+        respond.EnsureSuccessStatusCode();
+        return (await respond.Content.ReadAsStringAsync()).Trim();
     }
 }

@@ -206,11 +206,6 @@ async function toggle(id, turnOn) {
 }
 
 loadLamps();
-
-// Re-check the state every 10 seconds (in case someone else switches a lamp)
-setInterval(() => {
-  document.querySelectorAll(".led").forEach(row => refresh(row.id.replace("led-", "")));
-}, 10000);
     </script>
 </body>
 </html>

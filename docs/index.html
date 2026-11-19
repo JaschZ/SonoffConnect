@@ -1,127 +1,99 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>LED Control</title>
-    <style>
-        body {
-            font-family: system-ui, sans-serif;
-            max-width: 480px;
-            margin: 2rem auto;
-            padding: 0 1rem;
-            background: #f4f5f7;
-            color: #222;
-        }
-
-        h1 {
-            font-size: 1.4rem;
-        }
-
-        .led {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: #fff;
-            padding: 1rem;
-            margin-bottom: .75rem;
-            border-radius: 10px;
-            box-shadow: 0 1px 3px rgba(0,0,0,.1);
-        }
-
-        .name {
-            font-weight: 600;
-        }
-
-        .info {
-            font-size: .8rem;
-            color: #888;
-        }
-
-            .info.error {
-                color: #c0392b;
-            }
-
-        .switch {
-            position: relative;
-            width: 52px;
-            height: 28px;
-        }
-
-            .switch input {
-                opacity: 0;
-                width: 0;
-                height: 0;
-            }
-
-        .slider {
-            position: absolute;
-            inset: 0;
-            background: #ccc;
-            border-radius: 28px;
-            cursor: pointer;
-            transition: .2s;
-        }
-
-            .slider::before {
-                content: "";
-                position: absolute;
-                width: 22px;
-                height: 22px;
-                left: 3px;
-                top: 3px;
-                background: #fff;
-                border-radius: 50%;
-                transition: .2s;
-            }
-
-        input:checked + .slider {
-            background: #f1c40f;
-        }
-
-            input:checked + .slider::before {
-                transform: translateX(24px);
-            }
-
-        input:disabled + .slider {
-            opacity: .4;
-            cursor: not-allowed;
-        }
-    </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LED Control (Demo)</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 480px; margin: 2rem auto; padding: 0 1rem; background: #f4f5f7; color: #222; }
+  h1 { font-size: 1.4rem; }
+  .demo-note { background: #fff3cd; color: #7a5b00; padding: .6rem .8rem; border-radius: 8px; font-size: .85rem; margin-bottom: 1rem; }
+  .led { display: flex; justify-content: space-between; align-items: center; background: #fff; padding: 1rem; margin-bottom: .75rem; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+  .name { font-weight: 600; }
+  .info { font-size: .8rem; color: #888; }
+  .info.error { color: #c0392b; }
+  .switch { position: relative; width: 52px; height: 28px; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .slider { position: absolute; inset: 0; background: #ccc; border-radius: 28px; cursor: pointer; transition: .2s; }
+  .slider::before { content: ""; position: absolute; width: 22px; height: 22px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: .2s; }
+  input:checked + .slider { background: #f1c40f; }
+  input:checked + .slider::before { transform: translateX(24px); }
+  input:disabled + .slider { opacity: .4; cursor: not-allowed; }
+</style>
 </head>
 <body>
-    <h1>LED Control Panel</h1>
-    <div id="leds">Loading ...</div>
+<h1>LED Control Panel (Demo)</h1>
+<div class="demo-note">Demo mode: fake data, no real lamps are switched.</div>
+<div id="leds">Loading ...</div>
 
-    <script>
-
-  // DEMO: Fake data, no real API
+<script>
+// DEMO: fake data  no real API
 const demoLeds = [
   { id: "1", name: "Sonoff LED", on: true },
-  { id: "2", name: "Shelly LED", on: false }
+  { id: "2", name: "Shelly LED", on: false },
+  { id: "3", name: "Offline LED (example)", on: false, offline: true }
 ];
 
-async function loadLamps() {
+function loadLeds() {
   const list = document.getElementById("leds");
   list.replaceChildren();
   for (const led of demoLeds) {
     list.appendChild(buildRow(led));
-    showState(led.id, led.on ? "on" : "off", false);
+    showState(led.id, led.on ? "on" : "off", !!led.offline);
   }
 }
 
-async function refresh(id) {
-  const led = demoLeds.find(l => l.id === id);
-  showState(id, led.on ? "on" : "off", false);
+function buildRow(led) {
+  const row = document.createElement("div");
+  row.className = "led";
+  row.id = "led-" + led.id;
+
+  const textBox = document.createElement("div");
+  const nameEl = document.createElement("div");
+  nameEl.className = "name";
+  nameEl.textContent = led.name;
+  const infoEl = document.createElement("div");
+  infoEl.className = "info";
+  textBox.append(nameEl, infoEl);
+
+  const label = document.createElement("label");
+  label.className = "switch";
+  const checkbox = document.createElement("input");
+  checkbox.type = "checkbox";
+  checkbox.addEventListener("change", () => toggle(led.id, checkbox.checked));
+  const slider = document.createElement("span");
+  slider.className = "slider";
+  label.append(checkbox, slider);
+
+  row.append(textBox, label);
+  return row;
 }
 
-async function toggle(id, turnOn) {
+function showState(id, state, hasError) {
+  const row = document.getElementById("led-" + id);
+  if (!row) return;
+  const checkbox = row.querySelector("input");
+  const infoEl = row.querySelector(".info");
+  if (hasError) {
+    checkbox.disabled = true;
+    checkbox.checked = false;
+    infoEl.textContent = "not reachable";
+    infoEl.className = "info error";
+  } else {
+    checkbox.disabled = false;
+    checkbox.checked = state === "on";
+    infoEl.textContent = state === "on" ? "On" : "Off";
+    infoEl.className = "info";
+  }
+}
+
+function toggle(id, turnOn) {
   const led = demoLeds.find(l => l.id === id);
   led.on = turnOn;
   showState(id, turnOn ? "on" : "off", false);
 }
-// End of Demo
-//----------------------------------------------------------------
-    </script>
+
+loadLeds();
+</script>
 </body>
 </html>
